@@ -2,6 +2,9 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+// In-memory user store for development
+const users = [];
+
 // Define user schema
 const userSchema = new mongoose.Schema(
   {

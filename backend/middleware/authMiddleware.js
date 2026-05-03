@@ -10,19 +10,23 @@ const jwt = require('jsonwebtoken');
  */
 const authMiddleware = (req, res, next) => {
   try {
+    console.log('Auth middleware - Headers:', req.headers.authorization ? 'Token present' : 'No token');
     // Get token from header
     const token = req.headers.authorization?.split(' ')[1];
 
     // Check if token exists
     if (!token) {
+      console.log('No token provided');
       return res.status(401).json({
         success: false,
         message: 'No token provided. Authorization denied.',
       });
     }
 
+    console.log('Token received, verifying...');
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Token decoded:', decoded);
 
     // Attach user info to request object
     req.user = decoded;

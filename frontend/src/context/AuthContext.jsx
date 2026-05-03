@@ -146,7 +146,11 @@ export const AuthProvider = ({ children }) => {
    */
   const getProfile = async () => {
     try {
-      const response = await api.get('/auth/profile');
+      const response = await api.get('/auth/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       const userData = response.data.user;
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));

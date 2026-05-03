@@ -172,19 +172,6 @@ const LoginPage = () => {
           </Link>
         </p>
 
-        {/* Demo Credentials */}
-        <div className="mt-8 p-4 bg-gray-50 rounded border border-gray-200">
-          <p className="text-xs font-semibold text-gray-600 mb-2">Demo Credentials:</p>
-          <p className="text-xs text-gray-600">
-            <strong>Email:</strong> admin@example.com
-          </p>
-          <p className="text-xs text-gray-600 mb-2">
-            <strong>Password:</strong> password123
-          </p>
-          <p className="text-xs text-gray-500 italic">
-            (Create a new account to test registration)
-          </p>
-        </div>
       </div>
     </div>
   );

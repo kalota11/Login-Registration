@@ -3,14 +3,25 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 
-const useMockDatabase = process.env.SKIP_DB === 'true';
+// In-memory user store for development
+const users = [];
 
-const createMockUser = (email, name = null) => ({
-  _id: 'mock-user-id-' + Date.now(),
-  name: name || email.split('@')[0] || 'Test User',
-  email,
-  role: 'user',
-});
+// Helper functions for in-memory operations
+const findUserByEmail = (email) => users.find(user => user.email === email.toLowerCase());
+const findUserById = (id) => users.find(user => user._id === id);
+const createUser = (userData) => {
+  const user = {
+    _id: 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+    name: userData.name,
+    email: userData.email.toLowerCase(),
+    password: userData.password, // Will be hashed by pre-save hook
+    role: userData.role || 'user',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  users.push(user);
+  return user;
+};
 
 /**
  * Generate JWT token
@@ -22,7 +33,7 @@ const createMockUser = (email, name = null) => ({
  */
 const generateToken = (userId, role, email, name) => {
   return jwt.sign(
-    { id: userId, role: role, email, name },
+    { id: userId, role, email, name },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRE }
   );
@@ -36,7 +47,6 @@ const generateToken = (userId, role, email, name) => {
  */
 const register = async (req, res, next) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -48,7 +58,6 @@ const register = async (req, res, next) => {
 
     const { name, email, password, confirmPassword } = req.body;
 
-    // Check if passwords match
     if (password !== confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -56,32 +65,25 @@ const register = async (req, res, next) => {
       });
     }
 
-    // Check if user already exists
-    // let user = await User.findOne({ email });
-    // if (user) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: 'Email already registered',
-    //   });
-    // }
-    console.log('⚠️ User existence check skipped for testing');
+    const existingUser = findUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered',
+      });
+    }
 
-    // Temporarily skip DB save for testing
-    // await user.save();
-    console.log('⚠️ User save skipped for testing');
+    // Create user object and hash password
+    const userData = { name, email, password, role: 'user' };
+    const user = createUser(userData);
 
-    // Mock user object for token generation
-    const user = {
-      _id: 'mock-user-id-' + Date.now(),
-      name,
-      email,
-      role: 'user'
-    };
+    // Simulate password hashing (in real app, this would be done by pre-save hook)
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
 
-    // Generate token
-    const token = generateToken(user._id, user.role);
+    const token = generateToken(user._id, user.role, user.email, user.name);
 
-    // Return success response
     return res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -106,7 +108,6 @@ const register = async (req, res, next) => {
  */
 const login = async (req, res, next) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -118,34 +119,25 @@ const login = async (req, res, next) => {
 
     const { email, password } = req.body;
 
-    let user;
-    if (useMockDatabase) {
-      console.log('⚠️ Login DB lookup skipped for testing');
-      user = createMockUser(email);
-    } else {
-      // Check if user exists and get password field
-      user = await User.findOne({ email }).select('+password');
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid email or password',
-        });
-      }
-
-      // Check if password matches
-      const isPasswordCorrect = await user.matchPassword(password);
-      if (!isPasswordCorrect) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid email or password',
-        });
-      }
+    const user = findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
     }
 
-    // Generate token
+    const bcrypt = require('bcryptjs');
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
+    }
+
     const token = generateToken(user._id, user.role, user.email, user.name);
 
-    // Return success response
     return res.status(200).json({
       success: true,
       message: 'Logged in successfully',
@@ -170,20 +162,7 @@ const login = async (req, res, next) => {
  */
 const getProfile = async (req, res, next) => {
   try {
-    // req.user is set by authMiddleware
-    let user;
-    if (useMockDatabase) {
-      console.log('⚠️ Profile DB lookup skipped for testing');
-      user = {
-        _id: req.user.id,
-        name: req.user.name || 'Test User',
-        email: req.user.email || 'test@example.com',
-        role: req.user.role,
-        createdAt: new Date(),
-      };
-    } else {
-      user = await User.findById(req.user.id);
-    }
+    const user = findUserById(req.user.id);
 
     if (!user) {
       return res.status(404).json({
@@ -211,4 +190,5 @@ module.exports = {
   register,
   login,
   getProfile,
+  users, // Export for debugging
 };

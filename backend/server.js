@@ -1,9 +1,7 @@
 // Main Express Server File
 require('dotenv').config();
-process.env.SKIP_DB = 'true';
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
 // Import routes
@@ -16,9 +14,10 @@ const app = express();
 // Middleware
 // Enable CORS
 const allowedOrigins = [
-  'http://localhost:3005', // Frontend URL
+  process.env.FRONTEND_URL || 'http://localhost:3005',
   'http://localhost:3000', // Alternative frontend URL
   'http://localhost:3003', // Additional frontend URL
+  'http://localhost:3007', // Vite dev server default
 ];
 
 app.use(cors({
@@ -50,6 +49,20 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Server is running' });
 });
 
+// Debug endpoint to check registered users
+app.get('/api/debug/users', (req, res) => {
+  // Import the users array from authController
+  const authController = require('./controllers/authController');
+  const userCount = authController.users ? authController.users.length : 0;
+  const userEmails = authController.users ? authController.users.map(u => u.email) : [];
+  res.json({
+    success: true,
+    userCount,
+    userEmails,
+    message: 'Debug info for registered users'
+  });
+});
+
 // Authentication routes
 app.use('/api/auth', authRoutes);
 
@@ -71,13 +84,11 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
-    // Temporarily skip DB connection for testing
-    // await connectDB();
-    console.log('⚠️ Database connection skipped for testing');
+    // Using in-memory storage - no DB connection needed
     app.listen(PORT, () => {
       console.log(`\n✓ Server is running on port ${PORT}`);
       console.log(`✓ Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3005'}`);
-      console.log(`✓ MongoDB: Skipped for testing\n`);
+      console.log('✓ Using in-memory user storage\n');
     });
   } catch (error) {
     console.error('Failed to start server:', error.message);
